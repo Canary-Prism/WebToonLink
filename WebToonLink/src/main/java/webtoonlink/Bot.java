@@ -2,16 +2,23 @@ package webtoonlink;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Nullable;
-
 import org.apache.commons.text.StringEscapeUtils;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.DiscordApiBuilder;
+import org.javacord.api.entity.message.MessageFlag;
+import org.javacord.api.entity.message.component.ActionRow;
+import org.javacord.api.entity.message.component.Button;
 import org.javacord.api.entity.user.UserStatus;
+import org.javacord.api.interaction.ButtonInteraction;
+import org.javacord.api.interaction.SlashCommand;
+import org.javacord.api.interaction.SlashCommandInteraction;
+import org.javacord.api.interaction.SlashCommandOption;
+import org.javacord.api.interaction.SlashCommandOptionType;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
@@ -37,16 +44,145 @@ public class Bot implements Runnable {
 
     public Bot(String token) {
         this.token = token;
-        api = new DiscordApiBuilder().setToken(token).login().join();
+        api = new DiscordApiBuilder().setToken(this.token).login().join();
         api.updateStatus(UserStatus.DO_NOT_DISTURB);
         
         client = new WebClient(BrowserVersion.BEST_SUPPORTED);
     }
 
+
+    private ArrayList<Subscriber> tbd_subscribers = new ArrayList<>();
+    private ArrayList<Webtoon> tbd_webtoons = new ArrayList<>();
+
+    private Subscriber subscriber;
+    private Webtoon webtoon;
+    private String url;
     @Override
     public void run() {
 
-        ((ScheduledExecutorService)Executors.newFixedThreadPool(1)).scheduleAtFixedRate(this::checkWebtoons, 0, 30, TimeUnit.MINUTES);
+        api.addSlashCommandCreateListener((event) -> {
+            SlashCommandInteraction interaction = event.getSlashCommandInteraction();
+
+            if (interaction.getCommandName().equals("webtoon")) {System.out.println(desc);
+                if (interaction.getOptionByIndex(0).get().getName().equals("add")) {
+                    url = interaction.getOptionByIndex(0).get().getOptionByIndex(0).get().getStringValue().get();
+                    url = "https://www." + url.replaceAll("https://", "").replaceAll("www.", "").replaceAll("list?", "rss?");
+
+
+                    subscriber = null;
+                    webtoon = null;
+                    
+                    subscribers.forEach((e) -> {
+                        if (e.getChannel().equals(interaction.getChannel().get())) {
+                            subscriber = e;
+                            return;
+                        }
+                    });
+                    webtoons.forEach((e) -> {
+                        if (e.getUrl().equals(url)) {
+                            webtoon = e;
+                            return;
+                        }
+                    });
+
+                    if (subscriber.getSubbed().contains(webtoon)) {
+                        interaction.createImmediateResponder().setContent("Already subscribed to webtoon").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        return;
+                    }
+
+                    if (subscriber == null) {
+                        subscriber = new Subscriber(interaction.getChannel().get());
+                        subscribers.add(subscriber);
+                    }
+                    if (webtoon == null) {
+                        webtoon = new Webtoon(url);
+                        webtoons.add(webtoon);
+                    }
+                    
+                    subscriber.sub(webtoon);
+                    webtoon.sub(subscriber);
+
+                    checkWebtoons();
+                    
+                    interaction.createImmediateResponder().setContent("Added Webtoon \"" + webtoon.getTitle() + "\" to subscriptions");
+                } else if (interaction.getOptionByIndex(0).get().getName().equals("list")) {
+                    subscriber = null;
+                    subscribers.forEach((e) -> {
+                        if (e.getChannel().equals(interaction.getChannel().get())) {
+                            subscriber = e;
+                            return;
+                        }
+                    });
+                    if (subscriber == null) {
+                        interaction.createImmediateResponder().setContent("This channel doesn't have any subscribed webtoons");
+                        return;
+                    }
+                    String temp = "Subscribed Webtoons:";
+                    for (int i = 0; i < subscriber.getSubbed().size(); i++) {
+                        temp += "\n" + i + ": " + subscriber.getSubbed().get(i);
+                    }
+
+                    interaction.createImmediateResponder().setContent(temp).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                } else if (interaction.getOptionByIndex(0).get().getName().equals("remove")) {
+                    final int index = interaction.getOptionByIndex(0).get().getOptionByIndex(0).get().getLongValue().get().intValue();
+
+                    subscriber = null;
+                    subscribers.forEach((e) -> {
+                        if (e.getChannel().equals(interaction.getChannel().get())) {
+                            subscriber = e;
+                            return;
+                        }
+                    });
+                    if (subscriber == null) {
+                        interaction.createImmediateResponder().setContent("This channel doesn't have any subscribed Webtoons");
+                        return;
+                    }
+                    try {
+                        tbd_subscribers.add(subscriber);
+                        tbd_webtoons.add(subscriber.getSubbed().get(index));
+                        interaction.createImmediateResponder().setContent("Are you sure you want to unsubscribe from \"" + subscriber.getSubbed().get(index).getTitle() + "\"?").addComponents(ActionRow.of(
+                            Button.danger("confirm_delete", "Yes"),
+                            Button.secondary("cancel_delete", "No")
+                        )).respond().join();
+                    } catch (IndexOutOfBoundsException e) {
+                        interaction.createImmediateResponder().setContent("Not the index of a subscribed Webtoon").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        return;
+                    }
+                }
+            } else if (interaction.getCommandName().equals("ping")) {
+                interaction.createImmediateResponder().setContent("pinged").setFlags(MessageFlag.EPHEMERAL).respond().join();
+            }
+        });
+
+        api.addButtonClickListener((event) -> {
+            ButtonInteraction interaction = event.getButtonInteraction();
+            for (int i = 0; i < tbd_subscribers.size(); i++) {
+                if (tbd_subscribers.get(i).getChannel().equals(interaction.getChannel().get())) {
+
+                    Subscriber subscriber = tbd_subscribers.remove(i);
+                    Webtoon toon = tbd_webtoons.remove(i);
+
+                    if (interaction.getCustomId().equals("confirm_delete")) {
+                        subscriber.unsub(toon);
+                        if (subscriber.getSubbed().size() < 1)
+                            subscribers.remove(subscriber);
+                        
+                        toon.unsub(subscriber);
+                        if (toon.getSubscribers().size() < 1)
+                            webtoons.remove(toon);
+
+                        interaction.acknowledge();
+                        interaction.createImmediateResponder().setContent("Unsubscribed from \"" + toon.getTitle() + "\"").setFlags(MessageFlag.EPHEMERAL).respond().join();
+
+                    } else if (interaction.getCustomId().equals("cancel_delete")) {
+                        interaction.createImmediateResponder().setContent("Cancelled").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                    }
+                    return;
+                }
+            }
+        });
+
+        ((ScheduledExecutorService)Executors.newFixedThreadPool(1)).scheduleAtFixedRate(this::checkWebtoons, 0, 5, TimeUnit.MINUTES);
         
         api.updateStatus(UserStatus.ONLINE);
     }
@@ -71,11 +207,11 @@ public class Bot implements Runnable {
                 eplink = ((DomElement)page.getFirstByXPath("/rss/channel/item[1]/link")).asNormalizedText();
                 epdate = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/item[1]/pubDate")).asNormalizedText());
 
-                toon.checkForChanges(eptitle, desc, eptitle, eplink, epdate);
+                toon.checkForChanges(title, desc, eptitle, eplink, epdate);
             } catch (FailingHttpStatusCodeException | IOException e) {
                 e.printStackTrace();
-                toon.getChannels().forEach((subscriber) -> {
-                    subscriber.getChannel().sendMessage("The Webtoon with the name of " + toon.getName() + " is unavailable, the subscription will be removed");
+                toon.getSubscribers().forEach((subscriber) -> {
+                    subscriber.getChannel().sendMessage("The Webtoon with the name of " + toon.getTitle() + " is unavailable, the subscription will be removed");
                     subscriber.getSubbed().remove(toon);
                     
                 });
@@ -90,5 +226,28 @@ public class Bot implements Runnable {
             t = new Thread(this, "bot");
             t.start();
         }
+    }
+
+
+    protected void removeAllSlashCommands() {
+        api.getGlobalSlashCommands().join().forEach(command -> command.delete().join());
+
+        api.getServers().forEach(server -> api.getServerSlashCommands(server).join().forEach(command -> command.delete()));
+    }
+
+    protected SlashCommand createPingCommand() {
+        return SlashCommand.with("ping", "Pings the bot").createGlobal(api).join();
+    }
+
+    protected SlashCommand createWebtoonsCommand() {
+        return SlashCommand.with("webtoons", "Manage Webtoon subscriptions", Arrays.asList(
+            SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "add", "subscribe to a webtoon", Arrays.asList(
+                SlashCommandOption.create(SlashCommandOptionType.STRING, "url", "The url of the Webtoon", true)
+            )),
+            SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "list", "Lists all subscribed Webtoons with their index number", true),
+            SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "remove", "Removes a Webtoon from your subscriptions", Arrays.asList(
+                SlashCommandOption.create(SlashCommandOptionType.LONG, "index", "The index of the Webtoon to remove from subscriptions", true)
+            ))
+        )).createGlobal(api).join();
     }
 }
