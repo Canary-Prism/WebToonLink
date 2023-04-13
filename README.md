@@ -23,7 +23,7 @@ I'm assuming you know how to use GitHub. If not then here:
 1. Click above link
 2. Find latest release
 3. Find "Assets" Section
-4. Click the "SadnessClickerx.y.z.jar" file
+4. Click the "WebToonLinkx.y.z.jar" file
 
 ### Notice
 
