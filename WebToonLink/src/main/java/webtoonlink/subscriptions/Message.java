@@ -1,16 +1,13 @@
 package webtoonlink.subscriptions;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
-import org.apache.commons.text.StringEscapeUtils;
-
-public class Message {
+public class Message implements Serializable {
     
     private ArrayList<Part> parts = new ArrayList<>();
 
     private String temp;
-    private char state;
-
     public Message() {
         parts.add(new Text().in("The Webtoon "));
         parts.add(new Component().in("title"));
@@ -22,7 +19,6 @@ public class Message {
     public void in(String value) {
         parts.clear();
         temp = "";
-        state = 'l';
         for (char i : value.toCharArray()) {
             if (i == '<') {
                 parts.add(new Text().in(temp));
@@ -47,7 +43,7 @@ public class Message {
         return output;
     }
 
-    protected interface Part {
+    protected interface Part extends Serializable {
         public Part in(String string);
         public String out(Webtoon toon);
     }
@@ -84,8 +80,6 @@ public class Message {
          * </ul>
          */
         private int type;
-
-        private String text;
 
         @Override
         public Component in(String string) {

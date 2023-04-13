@@ -1,24 +1,50 @@
 package webtoonlink.subscriptions;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 import org.javacord.api.entity.channel.TextChannel;
 
-public class Subscriber {
-    private TextChannel channel;
-    private ArrayList<Webtoon> webtoons;
+import webtoonlink.Bot;
 
-    private ArrayList<Change> listens;
+public class Subscriber implements Serializable {
+    private transient TextChannel channel;
+    private long channelID;
+    private ArrayList<Webtoon> webtoons = new ArrayList<>();
+
+    private ArrayList<Change> listens = new ArrayList<>();
+
+    public Subscriber(TextChannel channel) {
+        this.channel = channel;
+        this.channelID = channel.getId();
+        this.listens.add(Change.LATEST_EP_CHANGE);
+    }
+
+    private Message message = new Message();
+
+    public boolean sub(Webtoon toon) {
+        if (!webtoons.contains(toon))
+            return webtoons.add(toon);
+        else
+            return false;
+    }
+
+    public boolean unsub(Webtoon toon) {
+        return webtoons.remove(toon);
+    }
 
     public ArrayList<Webtoon> getSubbed() {
         return webtoons;
     }
     
-    public TextChannel getChannel() {
+    public TextChannel getChannel(Bot bot) {
+        if (channel == null)
+            channel = bot.getApi().getTextChannelById(channelID).get();
         return channel;
     }
 
     private boolean cares;
+    
     public void broadcast(Webtoon toon, ArrayList<Change> changes) {
         cares = false;
         for (var change : changes)
@@ -27,7 +53,7 @@ public class Subscriber {
                 break;
             }
         if (cares) {
-            
+            channel.sendMessage(message.out(toon));
         }
     }
 }

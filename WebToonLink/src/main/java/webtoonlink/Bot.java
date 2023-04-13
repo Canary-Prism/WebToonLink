@@ -39,15 +39,27 @@ public class Bot implements Runnable {
     
     private DiscordApi api;
 
+    private Main main;
+
     private volatile ArrayList<Webtoon> webtoons = new ArrayList<>();
     private volatile ArrayList<Subscriber> subscribers = new ArrayList<>();
 
-    public Bot(String token) {
+    public Bot(String token, Main main) {
+        this.main = main;
         this.token = token;
         api = new DiscordApiBuilder().setToken(this.token).login().join();
         api.updateStatus(UserStatus.DO_NOT_DISTURB);
         
         client = new WebClient(BrowserVersion.BEST_SUPPORTED);
+    }
+
+    public DiscordApi getApi() {
+        return api;
+    }
+
+    protected void fromSave(ArrayList<Subscriber> subscribers, ArrayList<Webtoon> webtoons) {
+        this.subscribers = subscribers;
+        this.webtoons = webtoons;
     }
 
 
@@ -63,17 +75,17 @@ public class Bot implements Runnable {
         api.addSlashCommandCreateListener((event) -> {
             SlashCommandInteraction interaction = event.getSlashCommandInteraction();
 
-            if (interaction.getCommandName().equals("webtoon")) {System.out.println(desc);
+            if (interaction.getCommandName().equals("webtoons")) {
                 if (interaction.getOptionByIndex(0).get().getName().equals("add")) {
                     url = interaction.getOptionByIndex(0).get().getOptionByIndex(0).get().getStringValue().get();
-                    url = "https://www." + url.replaceAll("https://", "").replaceAll("www.", "").replaceAll("list?", "rss?");
+                    url = "https://www." + url.replaceAll("https://", "").replaceAll("www.", "").replaceAll("list\\?", "rss?");
 
 
                     subscriber = null;
                     webtoon = null;
                     
                     subscribers.forEach((e) -> {
-                        if (e.getChannel().equals(interaction.getChannel().get())) {
+                        if (e.getChannel(this).equals(interaction.getChannel().get())) {
                             subscriber = e;
                             return;
                         }
@@ -85,11 +97,6 @@ public class Bot implements Runnable {
                         }
                     });
 
-                    if (subscriber.getSubbed().contains(webtoon)) {
-                        interaction.createImmediateResponder().setContent("Already subscribed to webtoon").setFlags(MessageFlag.EPHEMERAL).respond().join();
-                        return;
-                    }
-
                     if (subscriber == null) {
                         subscriber = new Subscriber(interaction.getChannel().get());
                         subscribers.add(subscriber);
@@ -98,28 +105,43 @@ public class Bot implements Runnable {
                         webtoon = new Webtoon(url);
                         webtoons.add(webtoon);
                     }
+
+                    if (subscriber.getSubbed().contains(webtoon)) {
+                        interaction.createImmediateResponder().setContent("Already subscribed to webtoon").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        return;
+                    }
                     
                     subscriber.sub(webtoon);
                     webtoon.sub(subscriber);
 
-                    checkWebtoons();
+                    System.out.println(url);
+                    XmlPage page;
+                    try {
+                        page = client.getPage(url);
+                        page.getFirstByXPath("/rss/channel/title");
+                        title = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/title")).asNormalizedText());    
+                    } catch (FailingHttpStatusCodeException | IOException e1) {
+                        e1.printStackTrace();
+                    }
                     
-                    interaction.createImmediateResponder().setContent("Added Webtoon \"" + webtoon.getTitle() + "\" to subscriptions");
+                    interaction.createImmediateResponder().setContent("Added Webtoon \"" + title + "\" to subscriptions").setFlags(MessageFlag.EPHEMERAL).respond().join();
+
+                    checkWebtoons();
                 } else if (interaction.getOptionByIndex(0).get().getName().equals("list")) {
                     subscriber = null;
                     subscribers.forEach((e) -> {
-                        if (e.getChannel().equals(interaction.getChannel().get())) {
+                        if (e.getChannel(this).equals(interaction.getChannel().get())) {
                             subscriber = e;
                             return;
                         }
                     });
                     if (subscriber == null) {
-                        interaction.createImmediateResponder().setContent("This channel doesn't have any subscribed webtoons");
+                        interaction.createImmediateResponder().setContent("This channel doesn't have any subscribed webtoons").setFlags(MessageFlag.EPHEMERAL).respond().join();
                         return;
                     }
                     String temp = "Subscribed Webtoons:";
                     for (int i = 0; i < subscriber.getSubbed().size(); i++) {
-                        temp += "\n" + i + ": " + subscriber.getSubbed().get(i);
+                        temp += "\n" + i + ": " + subscriber.getSubbed().get(i).getTitle();
                     }
 
                     interaction.createImmediateResponder().setContent(temp).setFlags(MessageFlag.EPHEMERAL).respond().join();
@@ -128,7 +150,7 @@ public class Bot implements Runnable {
 
                     subscriber = null;
                     subscribers.forEach((e) -> {
-                        if (e.getChannel().equals(interaction.getChannel().get())) {
+                        if (e.getChannel(this).equals(interaction.getChannel().get())) {
                             subscriber = e;
                             return;
                         }
@@ -144,6 +166,8 @@ public class Bot implements Runnable {
                             Button.danger("confirm_delete", "Yes"),
                             Button.secondary("cancel_delete", "No")
                         )).respond().join();
+
+                        main.save(subscribers, webtoons);
                     } catch (IndexOutOfBoundsException e) {
                         interaction.createImmediateResponder().setContent("Not the index of a subscribed Webtoon").setFlags(MessageFlag.EPHEMERAL).respond().join();
                         return;
@@ -157,7 +181,7 @@ public class Bot implements Runnable {
         api.addButtonClickListener((event) -> {
             ButtonInteraction interaction = event.getButtonInteraction();
             for (int i = 0; i < tbd_subscribers.size(); i++) {
-                if (tbd_subscribers.get(i).getChannel().equals(interaction.getChannel().get())) {
+                if (tbd_subscribers.get(i).getChannel(this).equals(interaction.getChannel().get())) {
 
                     Subscriber subscriber = tbd_subscribers.remove(i);
                     Webtoon toon = tbd_webtoons.remove(i);
@@ -171,18 +195,20 @@ public class Bot implements Runnable {
                         if (toon.getSubscribers().size() < 1)
                             webtoons.remove(toon);
 
-                        interaction.acknowledge();
+
                         interaction.createImmediateResponder().setContent("Unsubscribed from \"" + toon.getTitle() + "\"").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        interaction.acknowledge();
 
                     } else if (interaction.getCustomId().equals("cancel_delete")) {
                         interaction.createImmediateResponder().setContent("Cancelled").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        interaction.acknowledge();
                     }
                     return;
                 }
             }
         });
 
-        ((ScheduledExecutorService)Executors.newFixedThreadPool(1)).scheduleAtFixedRate(this::checkWebtoons, 0, 5, TimeUnit.MINUTES);
+        ((ScheduledExecutorService)Executors.newScheduledThreadPool(1)).scheduleAtFixedRate(this::checkWebtoons, 0, 5, TimeUnit.MINUTES);
         
         api.updateStatus(UserStatus.ONLINE);
     }
@@ -200,7 +226,6 @@ public class Bot implements Runnable {
         webtoons.removeIf((toon) -> {
             try {
                 XmlPage page = client.getPage(toon.getUrl());
-                page.getFirstByXPath("/rss/channel/title");
                 title = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/title")).asNormalizedText());
                 desc = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/description")).asNormalizedText());
                 eptitle = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/item[1]/title")).asNormalizedText());
@@ -211,13 +236,14 @@ public class Bot implements Runnable {
             } catch (FailingHttpStatusCodeException | IOException e) {
                 e.printStackTrace();
                 toon.getSubscribers().forEach((subscriber) -> {
-                    subscriber.getChannel().sendMessage("The Webtoon with the name of " + toon.getTitle() + " is unavailable, the subscription will be removed");
+                    subscriber.getChannel(this).sendMessage("The Webtoon with the name of " + toon.getTitle() + " is unavailable, the subscription will be removed");
                     subscriber.getSubbed().remove(toon);
                     
                 });
             }
             return error;//delete all references to this webtoon if something weird happens
         });
+        main.save(subscribers, webtoons);
     }
     
 
@@ -228,6 +254,11 @@ public class Bot implements Runnable {
         }
     }
 
+    public void reloadAllSlashCommands() {
+        removeAllSlashCommands();
+        createPingCommand();
+        createWebtoonsCommand();
+    }
 
     protected void removeAllSlashCommands() {
         api.getGlobalSlashCommands().join().forEach(command -> command.delete().join());
@@ -244,7 +275,7 @@ public class Bot implements Runnable {
             SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "add", "subscribe to a webtoon", Arrays.asList(
                 SlashCommandOption.create(SlashCommandOptionType.STRING, "url", "The url of the Webtoon", true)
             )),
-            SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "list", "Lists all subscribed Webtoons with their index number", true),
+            SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "list", "Lists all subscribed Webtoons with their index number"),
             SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "remove", "Removes a Webtoon from your subscriptions", Arrays.asList(
                 SlashCommandOption.create(SlashCommandOptionType.LONG, "index", "The index of the Webtoon to remove from subscriptions", true)
             ))

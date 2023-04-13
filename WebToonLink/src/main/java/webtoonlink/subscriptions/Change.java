@@ -1,6 +1,8 @@
 package webtoonlink.subscriptions;
 
-public class Change {
+import java.io.Serializable;
+
+public class Change implements Serializable {
 
     private Change() {}
 
