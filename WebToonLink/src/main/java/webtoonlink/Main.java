@@ -19,6 +19,7 @@ import webtoonlink.subscriptions.Subscriber;
 import webtoonlink.subscriptions.Webtoon;
 
 import java.awt.BorderLayout;
+import java.awt.Taskbar;
 import java.awt.event.*;
 import java.io.File;
 import java.io.FileInputStream;
@@ -70,6 +71,11 @@ public class Main {
         //folder.
 
         frame.setIconImage(new ImageIcon(this.getClass().getClassLoader().getResource("icon/WebToonLink.png")).getImage());
+
+
+        final Taskbar tb = Taskbar.getTaskbar();
+        if (System.getProperty("os.name").contains("Mac"))
+            tb.setIconImage(new ImageIcon(Main.class.getClassLoader().getResource("canaryprismbot/icon/Ezlo.png")).getImage());
 
         folder = new File(workingDirectory);
         save_bot = new File(workingDirectory + "/bot.json");
