@@ -16,7 +16,7 @@ public class Message implements Serializable {
         parts.add(new Component().in("epLink"));
     }
 
-    public void in(String value) {
+    public Message in(String value) {
         parts.clear();
         temp = "";
         for (char i : value.toCharArray()) {
@@ -32,6 +32,8 @@ public class Message implements Serializable {
             }
             temp += i;
         }
+        parts.add(new Text().in(temp));
+        return this;
     }
 
     public String out(Webtoon toon) {
@@ -43,9 +45,19 @@ public class Message implements Serializable {
         return output;
     }
 
+    public String rawOut() {
+        String output = "";
+        
+        for (Part part : parts)
+            output += part.rawOut();
+        
+        return output;
+    }
+
     protected interface Part extends Serializable {
         public Part in(String string);
         public String out(Webtoon toon);
+        public String rawOut();
     }
 
     class Text implements Part {
@@ -59,6 +71,11 @@ public class Message implements Serializable {
 
         @Override
         public String out(Webtoon toon) {
+            return text;
+        }
+
+        @Override
+        public String rawOut() {
             return text;
         }
 
@@ -80,6 +97,7 @@ public class Message implements Serializable {
          * </ul>
          */
         private int type;
+        private String value;//for invalid tags, this is to restore functionality of pings mostly
 
         @Override
         public Component in(String string) {
@@ -93,13 +111,15 @@ public class Message implements Serializable {
                 case "hide" -> 7;
                 default -> 0;
             };
+            if (type == 0)
+                value = "<" + string + ">";
             return this;
         }
 
         @Override
         public String out(Webtoon toon) {
             return switch (type) {
-                case 0 -> "";
+                case 0 -> value;
                 case 1 -> toon.getTitle();
                 case 2 -> toon.getDesc();
                 case 3 -> toon.getEptitle();
@@ -108,6 +128,20 @@ public class Message implements Serializable {
                 case 6 -> "\n";
                 case 7 -> "||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|| _ _ _ _ _ _";
                 default -> throw new RuntimeException("This shouldn't even be possible");
+            };
+        }
+
+        @Override
+        public String rawOut() {
+            return switch (type) {
+                case 1 -> "<title>";
+                case 2 -> "<desc>";
+                case 3 -> "<epTitle>";
+                case 4 -> "<epLink>";
+                case 5 -> "<epPubDate>";
+                case 6 -> "<br>";
+                case 7 -> "<hide>";
+                default -> value;
             };
         }
     }

@@ -12,7 +12,7 @@ public class Subscriber implements Serializable {
     private long channelID;
     private ArrayList<Webtoon> webtoons = new ArrayList<>();
 
-    private ArrayList<Change> listens = new ArrayList<>();
+    public final ArrayList<Change> listens = new ArrayList<>();
 
     public Subscriber(TextChannel channel) {
         this.channel = channel;
@@ -35,6 +35,14 @@ public class Subscriber implements Serializable {
 
     public ArrayList<Webtoon> getSubbed() {
         return webtoons;
+    }
+
+    public Message getMessage() {
+        return message;
+    }
+
+    public void setMessage(Message message) {
+        this.message = message;
     }
     
     public TextChannel getChannel(Bot bot) {

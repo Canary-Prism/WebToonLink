@@ -10,9 +10,9 @@ public class Webtoon implements Serializable {
     private String url;
     private ArrayList<Subscriber> subscribers = new ArrayList<>();
 
-    private transient boolean isNew = true;
+    private boolean isNew = true;
 
-    private transient String
+    private String
         title = "",
         desc = "",
         eptitle = "",
@@ -67,11 +67,11 @@ public class Webtoon implements Serializable {
         }
 
         changes.clear();
-        if (!this.title.equals(title))
+        if (this.title == null || !this.title.equals(title))
             changes.add(Change.TITLE_CHANGE);
-        if (!this.desc.equals(desc))
+        if (this.desc == null || !this.desc.equals(desc))
             changes.add(Change.DESCRIPTION_CHANGE);
-        if (!this.epdate.equals(epdate))
+        if (this.epdate == null || !this.epdate.equals(epdate))
             changes.add(Change.LATEST_EP_CHANGE);
 
         this.title = title; this.desc = desc; this.eptitle = eptitle; this.eplink = eplink; this.epdate = epdate;

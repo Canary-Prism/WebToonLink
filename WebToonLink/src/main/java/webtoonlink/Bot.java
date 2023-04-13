@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.text.StringEscapeUtils;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.DiscordApiBuilder;
+import org.javacord.api.entity.intent.Intent;
 import org.javacord.api.entity.message.MessageFlag;
 import org.javacord.api.entity.message.component.ActionRow;
 import org.javacord.api.entity.message.component.Button;
@@ -18,6 +19,7 @@ import org.javacord.api.interaction.ButtonInteraction;
 import org.javacord.api.interaction.SlashCommand;
 import org.javacord.api.interaction.SlashCommandInteraction;
 import org.javacord.api.interaction.SlashCommandOption;
+import org.javacord.api.interaction.SlashCommandOptionChoice;
 import org.javacord.api.interaction.SlashCommandOptionType;
 
 import com.gargoylesoftware.htmlunit.BrowserVersion;
@@ -27,6 +29,8 @@ import com.gargoylesoftware.htmlunit.html.DomElement;
 import com.gargoylesoftware.htmlunit.xml.XmlPage;
 
 import webtoonlink.subscriptions.Webtoon;
+import webtoonlink.subscriptions.Change;
+import webtoonlink.subscriptions.Message;
 import webtoonlink.subscriptions.Subscriber;
 
 public class Bot implements Runnable {
@@ -47,7 +51,7 @@ public class Bot implements Runnable {
     public Bot(String token, Main main) {
         this.main = main;
         this.token = token;
-        api = new DiscordApiBuilder().setToken(this.token).login().join();
+        api = new DiscordApiBuilder().setToken(this.token).addIntents(Intent.DIRECT_MESSAGES).login().join();
         api.updateStatus(UserStatus.DO_NOT_DISTURB);
         
         client = new WebClient(BrowserVersion.BEST_SUPPORTED);
@@ -121,7 +125,8 @@ public class Bot implements Runnable {
                         page.getFirstByXPath("/rss/channel/title");
                         title = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/title")).asNormalizedText());    
                     } catch (FailingHttpStatusCodeException | IOException e1) {
-                        e1.printStackTrace();
+                        interaction.createImmediateResponder().setContent("Invalid Webtoon URL").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        return;
                     }
                     
                     interaction.createImmediateResponder().setContent("Added Webtoon \"" + title + "\" to subscriptions").setFlags(MessageFlag.EPHEMERAL).respond().join();
@@ -165,12 +170,89 @@ public class Bot implements Runnable {
                         interaction.createImmediateResponder().setContent("Are you sure you want to unsubscribe from \"" + subscriber.getSubbed().get(index).getTitle() + "\"?").addComponents(ActionRow.of(
                             Button.danger("confirm_delete", "Yes"),
                             Button.secondary("cancel_delete", "No")
-                        )).respond().join();
+                        )).setFlags(MessageFlag.EPHEMERAL).respond().join();
 
                         main.save(subscribers, webtoons);
                     } catch (IndexOutOfBoundsException e) {
                         interaction.createImmediateResponder().setContent("Not the index of a subscribed Webtoon").setFlags(MessageFlag.EPHEMERAL).respond().join();
                         return;
+                    }
+                }
+            } else if (interaction.getCommandName().equals("message")) {
+                if (interaction.getOptionByIndex(0).get().getName().equals("set")) {
+                    String str = interaction.getOptionByIndex(0).get().getOptionByIndex(0).get().getStringValue().get();
+                    subscriber = null;
+                    subscribers.forEach((e) -> {
+                        if (e.getChannel(this).equals(interaction.getChannel().get())) {
+                            subscriber = e;
+                            return;
+                        }
+                    });
+                    if (subscriber == null) {
+                        interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").respond().join();
+                        return;
+                    }
+                    Message message = new Message().in(str);
+                    subscriber.setMessage(message);
+                    interaction.createImmediateResponder().setContent("Done. here's an example of what that might look like: \n" + message.out(subscriber.getSubbed().get(0))).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                } else if (interaction.getOptionByIndex(0).get().getName().equals("get")) {
+                    subscriber = null;
+                    subscribers.forEach((e) -> {
+                        if (e.getChannel(this).equals(interaction.getChannel().get())) {
+                            subscriber = e;
+                            return;
+                        }
+                    });
+                    if (subscriber == null) {
+                        interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").respond().join();
+                        return;
+                    }
+                    interaction.createImmediateResponder().setContent("The current message that is set is: \n" + subscriber.getMessage().rawOut() + "\nwhich would look something like this: \n" + subscriber.getMessage().out(subscriber.getSubbed().get(0))).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                } else if ((interaction.getOptionByIndex(0).get().getName().equals("help"))) {
+                    interaction.createImmediateResponder().setContent("To set a new Message, do `/message set [Message]`\nYou can type literal words, or use some tags for attributes of the Webtoon\n`<title>` the webtoon title\n`<desc>` the webtoon description\n`<epTitle>` the latest episode title\n`<epLink>` the latest episode link\n`<epPubDate>` the latest episode publish date\n`<br>` line break\n`<hide>` text hider (this hides all text after it but keeps them functional. useful for hiding the urls if you just want embeds)").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                }
+            } else if (interaction.getCommandName().equals("notify")) {
+                subscriber = null;
+                subscribers.forEach((e) -> {
+                    if (e.getChannel(this).equals(interaction.getChannel().get())) {
+                        subscriber = e;
+                        return;
+                    }
+                });
+                if (subscriber == null) {
+                    interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                    return;
+                }
+                switch (interaction.getOptionByIndex(0).get().getLongValue().get().intValue()) {
+                    case 0 -> {
+                        if (subscriber.listens.contains(Change.TITLE_CHANGE))
+                            interaction.createImmediateResponder().setContent("Title Change notifications are **On**").addComponents(ActionRow.of(
+                                Button.danger("0notif_off", "Turn Off")
+                            )).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        else
+                            interaction.createImmediateResponder().setContent("Title Change notifications are **Off**").addComponents(ActionRow.of(
+                                Button.success("0notif_on", "Turn On")
+                            )).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                    }
+                    case 1 -> {
+                        if (subscriber.listens.contains(Change.DESCRIPTION_CHANGE))
+                            interaction.createImmediateResponder().setContent("Description Change notifications are **On**").addComponents(ActionRow.of(
+                                Button.danger("1notif_off", "Turn Off")
+                            )).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        else
+                            interaction.createImmediateResponder().setContent("Description Change notifications are **Off**").addComponents(ActionRow.of(
+                                Button.success("1notif_on", "Turn On")
+                            )).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                    }
+                    case 2 -> {
+                        if (subscriber.listens.contains(Change.LATEST_EP_CHANGE))
+                            interaction.createImmediateResponder().setContent("Latest Episode Change notifications are **On**").addComponents(ActionRow.of(
+                                Button.danger("2notif_off", "Turn Off")
+                            )).setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        else
+                            interaction.createImmediateResponder().setContent("Latest Episode Change notifications are **Off**").addComponents(ActionRow.of(
+                                Button.success("2notif_on", "Turn On")
+                            )).setFlags(MessageFlag.EPHEMERAL).respond().join();
                     }
                 }
             } else if (interaction.getCommandName().equals("ping")) {
@@ -180,31 +262,90 @@ public class Bot implements Runnable {
 
         api.addButtonClickListener((event) -> {
             ButtonInteraction interaction = event.getButtonInteraction();
-            for (int i = 0; i < tbd_subscribers.size(); i++) {
-                if (tbd_subscribers.get(i).getChannel(this).equals(interaction.getChannel().get())) {
+            if (interaction.getCustomId().contains("delete"))
+                for (int i = 0; i < tbd_subscribers.size(); i++) {
+                    if (tbd_subscribers.get(i).getChannel(this).equals(interaction.getChannel().get())) {
 
-                    Subscriber subscriber = tbd_subscribers.remove(i);
-                    Webtoon toon = tbd_webtoons.remove(i);
+                        Subscriber subscriber = tbd_subscribers.remove(i);
+                        Webtoon toon = tbd_webtoons.remove(i);
 
-                    if (interaction.getCustomId().equals("confirm_delete")) {
-                        subscriber.unsub(toon);
-                        if (subscriber.getSubbed().size() < 1)
-                            subscribers.remove(subscriber);
-                        
-                        toon.unsub(subscriber);
-                        if (toon.getSubscribers().size() < 1)
-                            webtoons.remove(toon);
+                        if (interaction.getCustomId().equals("confirm_delete")) {
+                            subscriber.unsub(toon);
+                            if (subscriber.getSubbed().size() < 1)
+                                subscribers.remove(subscriber);
+                            
+                            toon.unsub(subscriber);
+                            if (toon.getSubscribers().size() < 1)
+                                webtoons.remove(toon);
 
 
-                        interaction.createImmediateResponder().setContent("Unsubscribed from \"" + toon.getTitle() + "\"").setFlags(MessageFlag.EPHEMERAL).respond().join();
-                        interaction.acknowledge();
+                            interaction.createImmediateResponder().setContent("Unsubscribed from \"" + toon.getTitle() + "\"").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                            interaction.acknowledge();
 
-                    } else if (interaction.getCustomId().equals("cancel_delete")) {
-                        interaction.createImmediateResponder().setContent("Cancelled").setFlags(MessageFlag.EPHEMERAL).respond().join();
-                        interaction.acknowledge();
+                        } else if (interaction.getCustomId().equals("cancel_delete")) {
+                            interaction.createImmediateResponder().setContent("Cancelled").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                            interaction.acknowledge();
+                        }
+                        return;
                     }
+                }
+            else if (interaction.getCustomId().contains("notif")) {
+                subscriber = null;
+                subscribers.forEach((e) -> {
+                    if (e.getChannel(this).equals(interaction.getChannel().get())) {
+                        subscriber = e;
+                        return;
+                    }
+                });
+                if (subscriber == null) {
+                    interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").setFlags(MessageFlag.EPHEMERAL).respond().join();
                     return;
                 }
+                switch (interaction.getCustomId().charAt(0)) {
+                    case '0' -> {
+                        if (interaction.getCustomId().contains("on")) {
+                            if (subscriber.listens.contains(Change.TITLE_CHANGE))
+                                return;
+                            subscriber.listens.add(Change.TITLE_CHANGE);
+                            interaction.createImmediateResponder().setContent("Now being notified of Title Changes").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        } else {
+                            if (!subscriber.listens.contains(Change.TITLE_CHANGE))
+                                return;
+                            subscriber.listens.remove(Change.TITLE_CHANGE);
+                            interaction.createImmediateResponder().setContent("No longer being notified of Title Changes").setFlags(MessageFlag.EPHEMERAL).respond().join();
+
+                        }
+                    }
+                    case '1' -> {
+                        if (interaction.getCustomId().contains("on")) {
+                            if (subscriber.listens.contains(Change.DESCRIPTION_CHANGE))
+                                return;
+                            subscriber.listens.add(Change.DESCRIPTION_CHANGE);
+                            interaction.createImmediateResponder().setContent("Now being notified of Description Changes").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        } else {
+                            if (!subscriber.listens.contains(Change.DESCRIPTION_CHANGE))
+                                return;
+                            subscriber.listens.remove(Change.DESCRIPTION_CHANGE);
+                            interaction.createImmediateResponder().setContent("No longer being notified of Description Changes").setFlags(MessageFlag.EPHEMERAL).respond().join();
+
+                        }
+                    }
+                    case '2' -> {
+                        if (interaction.getCustomId().contains("on")) {
+                            if (subscriber.listens.contains(Change.LATEST_EP_CHANGE))
+                                return;
+                            subscriber.listens.add(Change.LATEST_EP_CHANGE);
+                            interaction.createImmediateResponder().setContent("Now being notified of Latest Episode Changes").setFlags(MessageFlag.EPHEMERAL).respond().join();
+                        } else {
+                            if (!subscriber.listens.contains(Change.LATEST_EP_CHANGE))
+                                return;
+                            subscriber.listens.remove(Change.LATEST_EP_CHANGE);
+                            interaction.createImmediateResponder().setContent("No longer being notified of Latests Episode Changes").setFlags(MessageFlag.EPHEMERAL).respond().join();
+
+                        }
+                    }
+                }
+                interaction.acknowledge();
             }
         });
 
@@ -233,10 +374,10 @@ public class Bot implements Runnable {
                 epdate = StringEscapeUtils.unescapeHtml4(((DomElement)page.getFirstByXPath("/rss/channel/item[1]/pubDate")).asNormalizedText());
 
                 toon.checkForChanges(title, desc, eptitle, eplink, epdate);
-            } catch (FailingHttpStatusCodeException | IOException e) {
-                e.printStackTrace();
+            } catch (FailingHttpStatusCodeException | IOException | ClassCastException e) {
+                error = true;
                 toon.getSubscribers().forEach((subscriber) -> {
-                    subscriber.getChannel(this).sendMessage("The Webtoon with the name of " + toon.getTitle() + " is unavailable, the subscription will be removed");
+                    subscriber.getChannel(this).sendMessage("The Webtoon with the url of " + toon.getUrl() + " is unavailable, the subscription will be removed");
                     subscriber.getSubbed().remove(toon);
                     
                 });
@@ -258,6 +399,8 @@ public class Bot implements Runnable {
         removeAllSlashCommands();
         createPingCommand();
         createWebtoonsCommand();
+        createMessageCommand();
+        createNotifyCommand();
     }
 
     protected void removeAllSlashCommands() {
@@ -278,6 +421,26 @@ public class Bot implements Runnable {
             SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "list", "Lists all subscribed Webtoons with their index number"),
             SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "remove", "Removes a Webtoon from your subscriptions", Arrays.asList(
                 SlashCommandOption.create(SlashCommandOptionType.LONG, "index", "The index of the Webtoon to remove from subscriptions", true)
+            ))
+        )).createGlobal(api).join();
+    }
+
+    protected SlashCommand createMessageCommand() {
+        return SlashCommand.with("message", "Manage the messages that get sent when a Webtoon updates", Arrays.asList(
+            SlashCommandOption.createWithOptions(SlashCommandOptionType.SUB_COMMAND, "set", "Set a the message that will be sent", Arrays.asList(
+                SlashCommandOption.create(SlashCommandOptionType.STRING, "message", "The message to set to", true)
+            )),
+            SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "get", "Get the current message that will be sent"),
+            SlashCommandOption.create(SlashCommandOptionType.SUB_COMMAND, "help", "Get help about this thing")
+        )).createGlobal(api).join();
+    }
+
+    protected SlashCommand createNotifyCommand() {
+        return SlashCommand.with("notify", "Manage what changes to the Webtoon this channel will listen to", Arrays.asList(
+            SlashCommandOption.createWithChoices(SlashCommandOptionType.LONG, "of", "Choosing a change", true,  Arrays.asList(
+                SlashCommandOptionChoice.create("Title Change", 0),
+                SlashCommandOptionChoice.create("Description Change", 1),
+                SlashCommandOptionChoice.create("Latest Episode Change", 2)                
             ))
         )).createGlobal(api).join();
     }
