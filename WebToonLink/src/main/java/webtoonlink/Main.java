@@ -75,7 +75,7 @@ public class Main {
 
         final Taskbar tb = Taskbar.getTaskbar();
         if (System.getProperty("os.name").contains("Mac"))
-            tb.setIconImage(new ImageIcon(Main.class.getClassLoader().getResource("canaryprismbot/icon/Ezlo.png")).getImage());
+            tb.setIconImage(new ImageIcon(Main.class.getClassLoader().getResource("icon/WebToonLink.png")).getImage());
 
         folder = new File(workingDirectory);
         save_bot = new File(workingDirectory + "/bot.json");
