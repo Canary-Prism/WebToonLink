@@ -3,6 +3,7 @@
  */
 package webtoonlink;
 
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -67,6 +68,8 @@ public class Main {
         workingDirectory += "/WebToonLink";
         //we are now free to set the workingDirectory to the subdirectory that is our 
         //folder.
+
+        frame.setIconImage(new ImageIcon(this.getClass().getClassLoader().getResource("icon/WebToonLink.png")).getImage());
 
         folder = new File(workingDirectory);
         save_bot = new File(workingDirectory + "/bot.json");
