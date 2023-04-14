@@ -36,8 +36,8 @@ This program uses Java, you should download and install Java Development Kit (JD
 ## Historical Changelog
 
 ### 1.1
-remembered that Changelogs are a thing
-updated the icon to have the "LINK" word be transparent
+* remembered that Changelogs are a thing
+* updated the icon to have the "LINK" word be transparent
 
 ### 1.0
 * made the thingy
