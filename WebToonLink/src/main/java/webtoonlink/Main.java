@@ -41,8 +41,11 @@ public class Main {
 
     private String workingDirectory;
 
-    private final static String[] CHANGELOG = {};
-    private final static String VERSION = null;
+    private final static String[] CHANGELOG = {
+        "remembered that Changelogs are a thing",
+        "updated the icon to have the \"LINK\" word be transparent"
+    };
+    private final static String VERSION = "1.1";
     
     private JFrame frame = new JFrame("WebToonLink");
     private final static int ROOM = 20;
