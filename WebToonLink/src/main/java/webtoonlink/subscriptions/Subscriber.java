@@ -2,6 +2,7 @@ package webtoonlink.subscriptions;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.NoSuchElementException;
 
 import org.javacord.api.entity.channel.TextChannel;
 
@@ -45,9 +46,11 @@ public class Subscriber implements Serializable {
         this.message = message;
     }
     
-    public TextChannel getChannel(Bot bot) {
+    public TextChannel getChannel(Bot bot) throws NoSuchElementException {
         if (channel == null)
-            channel = bot.getApi().getTextChannelById(channelID).get();
+            channel = bot.getApi().getTextChannelById(channelID).orElse(
+                bot.getApi().getServerTextChannelById(channelID).get()
+            );
         return channel;
     }
 

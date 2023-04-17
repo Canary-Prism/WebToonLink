@@ -3,6 +3,7 @@ package webtoonlink;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -75,6 +76,20 @@ public class Bot implements Runnable {
     private String url;
     @Override
     public void run() {
+
+        subscribers.removeIf((e) -> {
+            try {
+                e.getChannel(this);
+            } catch (NoSuchElementException nsee) {
+                webtoons.forEach((toon) -> {
+                    toon.unsub(e);
+                });
+                return true;
+            }
+            return false;
+        });
+
+
 
         api.addSlashCommandCreateListener((event) -> {
             SlashCommandInteraction interaction = event.getSlashCommandInteraction();
@@ -363,6 +378,17 @@ public class Bot implements Runnable {
         epdate;
 
     private synchronized void checkWebtoons() {
+        subscribers.removeIf((e) -> {
+            try {
+                e.getChannel(this);
+            } catch (NoSuchElementException nsee) {
+                webtoons.forEach((toon) -> {
+                    toon.unsub(e);
+                });
+                return true;
+            }
+            return false;
+        });
         error = false;
         webtoons.removeIf((toon) -> {
             try {
