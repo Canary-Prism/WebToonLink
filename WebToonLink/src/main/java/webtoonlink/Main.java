@@ -42,10 +42,9 @@ public class Main {
     private String workingDirectory;
 
     private final static String[] CHANGELOG = {
-        "remembered that Changelogs are a thing",
-        "updated the icon to have the \"LINK\" word be transparent"
+        "fixed response message not being ephemeral when /message get is invoked on an unitialised channel"
     };
-    private final static String VERSION = "1.1";
+    private final static String VERSION = "1.2";
     
     private JFrame frame = new JFrame("WebToonLink");
     private final static int ROOM = 20;

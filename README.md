@@ -35,6 +35,9 @@ This program uses Java, you should download and install Java Development Kit (JD
 
 ## Historical Changelog
 
+### 1.2
+* fixed response message not being ephemeral when `/message get` is invoked on an unitialised channel
+
 ### 1.1
 * remembered that Changelogs are a thing
 * updated the icon to have the "LINK" word be transparent
