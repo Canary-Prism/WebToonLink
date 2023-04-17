@@ -35,6 +35,9 @@ This program uses Java, you should download and install Java Development Kit (JD
 
 ## Historical Changelog
 
+### 1.3
+* added a feature where if a subscriber is unavailable it will be removed from memory
+
 ### 1.2
 * fixed response message not being ephemeral when `/message get` is invoked on an unitialised channel
 

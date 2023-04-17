@@ -42,9 +42,9 @@ public class Main {
     private String workingDirectory;
 
     private final static String[] CHANGELOG = {
-        "fixed response message not being ephemeral when /message get is invoked on an unitialised channel"
+        "added a feature where if a subscriber is unavailable it will be removed from memory"
     };
-    private final static String VERSION = "1.2";
+    private final static String VERSION = "1.3";
     
     private JFrame frame = new JFrame("WebToonLink");
     private final static int ROOM = 20;
