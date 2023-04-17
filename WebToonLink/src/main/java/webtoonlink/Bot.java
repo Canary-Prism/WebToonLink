@@ -189,7 +189,7 @@ public class Bot implements Runnable {
                         }
                     });
                     if (subscriber == null) {
-                        interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").respond().join();
+                        interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").setFlags(MessageFlag.EPHEMERAL).respond().join();
                         return;
                     }
                     Message message = new Message().in(str);
@@ -204,7 +204,7 @@ public class Bot implements Runnable {
                         }
                     });
                     if (subscriber == null) {
-                        interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").respond().join();
+                        interaction.createImmediateResponder().setContent("Subscribe to a Webtoon first").setFlags(MessageFlag.EPHEMERAL).respond().join();
                         return;
                     }
                     interaction.createImmediateResponder().setContent("The current message that is set is: \n" + subscriber.getMessage().rawOut() + "\nwhich would look something like this: \n" + subscriber.getMessage().out(subscriber.getSubbed().get(0))).setFlags(MessageFlag.EPHEMERAL).respond().join();
