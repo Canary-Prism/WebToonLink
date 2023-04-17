@@ -11,8 +11,6 @@ the first time you launch the .jar you will be prompted for your bot's token, th
 `/notify` deals with what changes in the subscribed webtoons a channel will care about  
 `/message` and its subcommands deal with the messages that get sent when change a channel cares about happens
 
-### Warning: due to the taskbar icon locations being different between the sourcecode and the final .jar file, **THIS WILL ONLY LAUNCH IN THE JAR FILE**
-
 
 ### [Download](https://github.com/Canary-Prism/WebToonLink/releases/)
 
