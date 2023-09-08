@@ -1,9 +1,8 @@
 package webtoonlink.subscriptions;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Message implements Serializable {
+public class Message  {
     
     private ArrayList<Part> parts = new ArrayList<>();
 
@@ -54,7 +53,7 @@ public class Message implements Serializable {
         return output;
     }
 
-    protected interface Part extends Serializable {
+    protected interface Part {
         public Part in(String string);
         public String out(Webtoon toon);
         public String rawOut();

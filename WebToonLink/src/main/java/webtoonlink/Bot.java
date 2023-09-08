@@ -52,7 +52,7 @@ public class Bot implements Runnable {
     public Bot(String token, Main main) {
         this.main = main;
         this.token = token;
-        api = new DiscordApiBuilder().setToken(this.token).addIntents(Intent.DIRECT_MESSAGES).login().join();
+        api = new DiscordApiBuilder().setToken(this.token).addIntents(Intent.DIRECT_MESSAGES, Intent.GUILDS).login().join();
         api.updateStatus(UserStatus.DO_NOT_DISTURB);
         
         client = new WebClient(BrowserVersion.BEST_SUPPORTED);
@@ -77,6 +77,10 @@ public class Bot implements Runnable {
     @Override
     public void run() {
 
+        subscribers.forEach((e) -> {
+            e.getChannel(this);
+        });
+
         subscribers.removeIf((e) -> {
             try {
                 e.getChannel(this);
@@ -97,7 +101,7 @@ public class Bot implements Runnable {
             if (interaction.getCommandName().equals("webtoons")) {
                 if (interaction.getOptionByIndex(0).get().getName().equals("add")) {
                     url = interaction.getOptionByIndex(0).get().getOptionByIndex(0).get().getStringValue().get();
-                    url = "https://www." + url.replaceAll("https://", "").replaceAll("www.", "").replaceAll("list\\?", "rss?");
+                    url = "https://www." + url.replaceAll("https://", "").replaceAll("www.", "").replaceAll("list\\?", "rss?").replaceAll("canvas", "challenge");
 
 
                     subscriber = null;
@@ -117,7 +121,7 @@ public class Bot implements Runnable {
                     });
 
                     if (subscriber == null) {
-                        subscriber = new Subscriber(interaction.getChannel().get());
+                        subscriber = new Subscriber(interaction.getChannel().get(), interaction.getUser().getId());
                         subscribers.add(subscriber);
                     }
                     if (webtoon == null) {

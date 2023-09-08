@@ -1,12 +1,21 @@
 package webtoonlink.subscriptions;
 
-import java.io.Serializable;
+import java.util.ArrayList;
 
-public class Change implements Serializable {
+public enum Change {
+    TITLE_CHANGE, //1
+    DESCRIPTION_CHANGE, //2
+    LATEST_EP_CHANGE; //4
 
-    private Change() {}
-
-    public static final Change TITLE_CHANGE = new Change();
-    public static final Change DESCRIPTION_CHANGE = new Change();
-    public static final Change LATEST_EP_CHANGE = new Change();
+    public int encode() {
+        return 1 << ordinal();
+    }
+    public static ArrayList<Change> decode(int bit) {
+        ArrayList<Change> changes = new ArrayList<>();
+        for (Change change : Change.values()) {
+            if ((bit & change.encode()) != 0)
+                changes.add(change);
+        }
+        return changes;
+    }
 }

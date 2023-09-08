@@ -1,9 +1,8 @@
 package webtoonlink.subscriptions;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Webtoon implements Serializable {
+public class Webtoon {
     /**
      * Must be the full url to the rss of the Webtoon
      */
@@ -21,6 +20,14 @@ public class Webtoon implements Serializable {
     
     public Webtoon(String url) {
         this.url = url;
+    }
+    public Webtoon(String url, String title, String desc, String eptitle, String eplink, String epdate) {
+        this.url = url;
+        this.title = title;
+        this.desc = desc;
+        this.eptitle = eptitle;
+        this.eplink = eplink;
+        this.epdate = epdate;
     }
     
     public String getUrl() {
@@ -79,5 +86,13 @@ public class Webtoon implements Serializable {
         subscribers.forEach((e) -> {
             e.broadcast(this, changes);
         });
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Webtoon) {
+            return ((Webtoon) obj).getUrl().equals(url);
+        }
+        return false;
     }
 }
