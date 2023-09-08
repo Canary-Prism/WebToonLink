@@ -11,6 +11,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONWriter;
@@ -22,14 +23,11 @@ import java.awt.BorderLayout;
 import java.awt.Taskbar;
 import java.awt.event.*;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InvalidClassException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 
 public class Main {
@@ -42,9 +40,9 @@ public class Main {
     private String workingDirectory;
 
     private final static String[] CHANGELOG = {
-        "added a feature where if a subscriber is unavailable it will be removed from memory"
+        "Finally gotten around to fixing save data"
     };
-    private final static String VERSION = "1.3";
+    private final static String VERSION = "2.0";
     
     private JFrame frame = new JFrame("WebToonLink");
     private final static int ROOM = 20;
@@ -81,8 +79,8 @@ public class Main {
 
         folder = new File(workingDirectory);
         save_bot = new File(workingDirectory + "/bot.json");
-        save_webtoons = new File(workingDirectory + "/webtoons");
-        save_subscribers = new File(workingDirectory + "/subscribers");
+        save_webtoons = new File(workingDirectory + "/webtoons.json");
+        save_subscribers = new File(workingDirectory + "/subscribers.json");
 
         
         frame.setResizable(false);
@@ -177,7 +175,6 @@ public class Main {
     private ArrayList<Subscriber> subscribers;
     private ArrayList<Webtoon> webtoons;
 
-    @SuppressWarnings("unchecked")
     private void loadSaves() {
         try {
             if (!folder.exists())
@@ -198,17 +195,89 @@ public class Main {
                 }
 
                 if (save_webtoons.exists()) {
-                    try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(save_webtoons));) {
-                        webtoons = ((ArrayList<Webtoon>)in.readObject());
-                    } catch (InvalidClassException | ClassNotFoundException e) {}
-                } else {
-                    save_webtoons.createNewFile();
+                    try {
+                        var lines = Files.readAllLines(save_webtoons.toPath());
+
+                        String data = "";
+
+                        for (var line : lines) {
+                            data += line;
+                        }
+
+                        JSONArray contents = new JSONArray(data);
+
+                        Webtoon webtoon;
+
+                        webtoons = new ArrayList<>();
+
+                        for (var e : contents) {
+                            var webtoon_json = (JSONObject) e;
+                            webtoon = new Webtoon(
+                                webtoon_json.getString("url"),
+                                webtoon_json.getString("title"),
+                                webtoon_json.getString("desc"),
+                                webtoon_json.getString("eptitle"),
+                                webtoon_json.getString("eplink"),
+                                webtoon_json.getString("epdate")
+                            );
+
+                            webtoons.add(webtoon);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
 
                 if (save_subscribers.exists()) {
-                    try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(save_subscribers));) {
-                        subscribers = ((ArrayList<Subscriber>)in.readObject());
-                    } catch (InvalidClassException | ClassNotFoundException e) {}
+                    try {
+                        var lines = Files.readAllLines(save_subscribers.toPath());
+
+                        String data = "";
+
+                        for (var line : lines) {
+                            data += line;
+                        }
+
+                        JSONArray contents = new JSONArray(data);
+
+                        Webtoon webtoon;
+
+                        subscribers = new ArrayList<>();
+                        var subscribers_webtoons = new ArrayList<Webtoon>();
+
+                        for (var e : contents) {
+                            var subscriber = (JSONObject) e;
+                            var strings = subscriber.getJSONArray("subbed").toList().stream().map((f) -> (String) f).toList();
+
+                            for (var string : strings) {
+                                webtoon = new Webtoon(string);
+                                if (!webtoons.contains(webtoon))
+                                    throw new InvalidClassException("Webtoon not found");
+                                else
+                                    webtoon = webtoons.get(webtoons.indexOf(webtoon));
+
+                                subscribers_webtoons.add(webtoon);
+                            }
+    
+                            var subscriber_subscriber = new Subscriber(
+                                subscriber.getLong("channel_id"), 
+                                subscriber.getString("message"), 
+                                subscriber.getInt("listens"), 
+                                subscribers_webtoons,
+                                subscriber.getBoolean("isDM"),
+                                subscriber.getLong("user_id")
+                            );
+
+                            subscribers.add(subscriber_subscriber);
+
+                            subscribers_webtoons.forEach((f) -> f.sub(subscriber_subscriber));
+
+                            subscribers_webtoons.clear();
+                        }
+                        
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         } catch (IOException e) {
@@ -234,12 +303,76 @@ public class Main {
     }
 
     protected void save(ArrayList<Subscriber> subscribers, ArrayList<Webtoon> webtoons) {
-        try (
-            ObjectOutputStream subscribers_out = new ObjectOutputStream(new FileOutputStream(save_subscribers));
-            ObjectOutputStream webtoons_out = new ObjectOutputStream(new FileOutputStream(save_webtoons));
-        ) {
-            subscribers_out.writeObject(subscribers);
-            webtoons_out.writeObject(webtoons);
+        try {
+            FileWriter subscribers_writer = new FileWriter(save_subscribers);
+            JSONWriter subscribers_json = new JSONWriter(subscribers_writer);
+            subscribers_json
+            .array();
+
+            for (var subscriber : subscribers) {
+                subscribers_json
+                .object()
+                    .key("channel_id")
+                    .value(subscriber.getChannelId())
+                    .key("message")
+                    .value(subscriber.getMessage().rawOut())
+                    .key("isDM")
+                    .value(subscriber.isDM())
+                    .key("user_id")
+                    .value(subscriber.getUserId())
+                    .key("listens");
+
+                int listens = 0;
+                for (var e : subscriber.listens) {
+                    listens += e.encode();
+                }
+
+                subscribers_json
+                    .value(listens)
+                    .key("subbed")
+                    .array();
+                for (var webtoon : subscriber.getSubbed()) {
+                    subscribers_json
+                        .value(webtoon.getUrl());
+                }
+                subscribers_json
+                    .endArray();
+
+                subscribers_json
+                .endObject();
+            }
+
+            subscribers_json
+            .endArray();
+            subscribers_writer.close();
+
+            FileWriter webtoons_writer = new FileWriter(save_webtoons);
+            JSONWriter webtoons_json = new JSONWriter(webtoons_writer);
+            webtoons_json
+            .array();
+
+            for (var webtoon : webtoons) {
+                webtoons_json
+                .object()
+                    .key("url")
+                    .value(webtoon.getUrl())
+                    .key("title")
+                    .value(webtoon.getTitle())
+                    .key("desc")
+                    .value(webtoon.getDesc())
+                    .key("eptitle")
+                    .value(webtoon.getEptitle())
+                    .key("eplink")
+                    .value(webtoon.getEplink())
+                    .key("epdate")
+                    .value(webtoon.getEpdate())
+                .endObject();
+            }
+
+            webtoons_json
+            .endArray();
+            webtoons_writer.close();
+
         } catch (IOException e) {
             JOptionPane.showMessageDialog(null, "Cannot Access Save Data", "sadness", JOptionPane.ERROR_MESSAGE);
             System.exit(-1);

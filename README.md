@@ -33,6 +33,9 @@ This program uses Java, you should download and install Java Development Kit (JD
 
 ## Historical Changelog
 
+## 2.0
+* Finally gotten around to fixing save data
+
 ### 1.3
 * added a feature where if a subscriber is unavailable it will be removed from memory
 
