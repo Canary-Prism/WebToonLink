@@ -40,9 +40,9 @@ public class Main {
     private String workingDirectory;
 
     private final static String[] CHANGELOG = {
-        "Finally gotten around to fixing save data"
+        "fixed the taskbar thing"
     };
-    private final static String VERSION = "2.0";
+    private final static String VERSION = "2.0.1";
     
     private JFrame frame = new JFrame("WebToonLink");
     private final static int ROOM = 20;
@@ -73,9 +73,11 @@ public class Main {
         frame.setIconImage(new ImageIcon(this.getClass().getClassLoader().getResource("icon/WebToonLink.png")).getImage());
 
 
-        final Taskbar tb = Taskbar.getTaskbar();
-        if (System.getProperty("os.name").contains("Mac"))
+        
+        if (System.getProperty("os.name").contains("Mac")) {
+            final Taskbar tb = Taskbar.getTaskbar();
             tb.setIconImage(new ImageIcon(Main.class.getClassLoader().getResource("icon/WebToonLink.png")).getImage());
+        }
 
         folder = new File(workingDirectory);
         save_bot = new File(workingDirectory + "/bot.json");

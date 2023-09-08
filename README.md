@@ -33,6 +33,9 @@ This program uses Java, you should download and install Java Development Kit (JD
 
 ## Historical Changelog
 
+### 2.0,1
+* fixed the taskbar thing
+
 ### 2.0
 * Finally gotten around to fixing save data
 
