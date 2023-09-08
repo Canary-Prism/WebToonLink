@@ -33,7 +33,7 @@ This program uses Java, you should download and install Java Development Kit (JD
 
 ## Historical Changelog
 
-## 2.0
+### 2.0
 * Finally gotten around to fixing save data
 
 ### 1.3
